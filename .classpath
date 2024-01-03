@@ -7,6 +7,6 @@
 	</classpathentry>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="assets"/>
-	<classpathentry kind="lib" path="C:/Users/Supervisor/git/node-builder/lib/rsyntaxtextarea-3.3.4.jar"/>
+	<classpathentry kind="lib" path="lib/rsyntaxtextarea-3.3.4.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

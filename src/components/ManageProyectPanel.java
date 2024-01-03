@@ -12,44 +12,37 @@ import javax.swing.JScrollPane;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.io.File;
-import javax.swing.event.TreeSelectionListener;
-import javax.swing.event.TreeSelectionEvent;
+import java.util.ArrayList;
+import java.util.List;
 import java.awt.BorderLayout;
+import java.awt.Color;
+
 import javax.swing.JButton;
-import javax.swing.BoxLayout;
-import javax.swing.border.EmptyBorder;
+import javax.swing.JLabel;
+
 import java.awt.FlowLayout;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+
+import javax.swing.JTabbedPane;
 
 public class ManageProyectPanel extends JPanel {
 
 	private static final long serialVersionUID = 1L;
-	private JPanel panelManage;
 	private JButton btnEjecutar;
 	private JButton btnCrearModulo;
 	private JTree tree;
 	private String path;
-	
+	private JTabbedPane panelManage;
+	private List<String> filesEditing;
+
 	public ManageProyectPanel(String path) {
 		this.path = path;
+		this.filesEditing = new ArrayList<String>();
+
 		setLayout(new BorderLayout(0, 0));
 
 		tree = new JTree();
-		tree.addTreeSelectionListener(new TreeSelectionListener() {
-			@Override
-			public void valueChanged(TreeSelectionEvent e) {
-				TreePath path = e.getPath();
-				if (e.isAddedPath() && path.getLastPathComponent() instanceof DefaultMutableTreeNode) {
-					DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
-					Object userObject = node.getUserObject();
-
-					if (userObject instanceof File) {
-						File selectedFile = (File) userObject;
-						System.out.println("Doble clic en: " + selectedFile.getAbsolutePath());
-
-					}
-				}
-			}
-		});
 		tree.setCellRenderer(new FileTreeCellRenderer());
 		tree.setPreferredSize(new Dimension(200, Short.MIN_VALUE));
 
@@ -67,12 +60,30 @@ public class ManageProyectPanel extends JPanel {
 		JScrollPane scrollPane = new JScrollPane(tree);
 		add(scrollPane, BorderLayout.WEST);
 
-		panelManage = new JPanel();
-		panelManage.setBorder(new EmptyBorder(10, 10, 10, 10));
+		panelManage = new JTabbedPane(JTabbedPane.TOP);
 		add(panelManage, BorderLayout.CENTER);
-		panelManage.setLayout(new BoxLayout(panelManage, BoxLayout.X_AXIS));
-	
+
 		actualizarArchivos();
+	}
+
+	public File getSelectedFile() {
+		TreePath path = tree.getSelectionPath();
+		if (path != null) {
+			DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+			Object userObject = node.getUserObject();
+
+			if (userObject instanceof FileNode) {
+				FileNode fileNode = (FileNode) userObject;
+				File selectedFile = fileNode.getFile();
+				return selectedFile;
+			}
+		}
+
+		return null;
+	}
+
+	public JTree getTree() {
+		return tree;
 	}
 
 	public void actualizarArchivos() {
@@ -81,20 +92,28 @@ public class ManageProyectPanel extends JPanel {
 		buildFileTree(rootFile, rootNode);
 		DefaultTreeModel treeModel = new DefaultTreeModel(rootNode);
 		tree.setModel(treeModel);
-		
+
 	}
 
 	public JButton getBtnCrearModulo() {
 		return btnCrearModulo;
 	}
 
-	public void addManagePanel(JPanel panel) {
-		panelManage.removeAll();
-		panelManage.add(panel);
+	public void addManagePanel(String title, JPanel panel) {
 
-		panelManage.updateUI();
-		panelManage.repaint();
-		panelManage.revalidate();
+		String filePath = title.equals("Crear Modulo") ? title : ((EditorPanel) panel).getFilePath();
+
+		if (filesEditing.contains(filePath)) {
+			panelManage.setSelectedIndex(filesEditing.indexOf(filePath));
+			return;
+		}
+
+		panelManage.addTab(title, panel);
+		filesEditing.add(filePath);
+		panelManage.setSelectedIndex(filesEditing.indexOf(filePath));
+
+		int index = panelManage.indexOfTab(title);
+		panelManage.setTabComponentAt(index, new ClosableTabComponent(panelManage, this.filesEditing));
 
 	}
 
@@ -115,6 +134,9 @@ public class ManageProyectPanel extends JPanel {
 		}
 	}
 
+	public List<String> getFilesEditing() {
+		return this.filesEditing;
+	}
 }
 
 class FileNode {
@@ -159,4 +181,63 @@ class FileTreeCellRenderer extends DefaultTreeCellRenderer {
 
 		return this;
 	}
+}
+
+class ClosableTabComponent extends JPanel {
+
+	private static final long serialVersionUID = 1L;
+	private final JTabbedPane tabbedPane;
+
+	public ClosableTabComponent(final JTabbedPane tabbedPane, List<String> filesEditing) {
+		super(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		this.tabbedPane = tabbedPane;
+		setOpaque(false);
+
+		JLabel label = new JLabel() {
+
+			private static final long serialVersionUID = 1L;
+
+			public String getText() {
+				int i = tabbedPane.indexOfTabComponent(ClosableTabComponent.this);
+				if (i != -1) {
+					return tabbedPane.getTitleAt(i);
+				}
+				return null;
+			}
+		};
+
+		add(label);
+
+		JButton closeButton = new JButton("x");
+		closeButton.setPreferredSize(new Dimension(20, 20));
+		closeButton.setBorder(null);
+		closeButton.setBorderPainted(false);
+		closeButton.setFocusPainted(false);
+		closeButton.setContentAreaFilled(false);
+
+		closeButton.addMouseListener(new MouseAdapter() {
+			public void mouseEntered(MouseEvent e) {
+				closeButton.setContentAreaFilled(true);
+				closeButton.setBackground(Color.lightGray); // Puedes ajustar el color según tus preferencias
+			}
+
+			public void mouseExited(MouseEvent e) {
+				closeButton.setContentAreaFilled(false);
+			}
+		});
+
+		closeButton.addActionListener(e -> {
+			int index = tabbedPane.indexOfTabComponent(ClosableTabComponent.this);
+			filesEditing.remove(index);
+			if (index != -1) {
+				tabbedPane.remove(index);
+			}
+		});
+		add(closeButton);
+	}
+
+	public JTabbedPane getTabbedPane() {
+		return tabbedPane;
+	}
+
 }

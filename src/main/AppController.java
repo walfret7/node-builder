@@ -4,6 +4,10 @@ import java.awt.BorderLayout;
 import java.awt.EventQueue;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -18,13 +22,16 @@ import javax.swing.JProgressBar;
 import javax.swing.SwingWorker;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.WindowConstants;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileSystemView;
 
 import components.CreateModulePanel;
 import components.CreateProyectPanel;
+import components.EditorPanel;
 import components.MainPanel;
 import components.ManageProyectPanel;
+import components.Module;
 import nodeComponents.Controller;
 import nodeComponents.DbConfig;
 import nodeComponents.Migrate;
@@ -33,8 +40,6 @@ import nodeComponents.RouterMain;
 import nodeComponents.Routes;
 import nodeComponents.Server;
 import queryComponents.DB;
-
-import components.Module;
 
 public class AppController {
 
@@ -47,7 +52,8 @@ public class AppController {
 	private String rutaConfig;
 	private String rutaMigrate;
 	private ManageProyectPanel proyectPanel;
-
+	private EditorPanel editorPanel;
+	
 	public static void main(String[] args) {
 
 		try {
@@ -72,6 +78,30 @@ public class AppController {
 
 		frame = new MainFrame();
 		frame.setVisible(true);
+		frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+		frame.addWindowListener(new WindowAdapter() {
+			@Override
+			public void windowClosing(WindowEvent e) {
+				
+				
+                if (editorPanel!=null && editorPanel.isEditing()) {
+                    int opcion = JOptionPane.showConfirmDialog(frame,
+                            "¿Desea guardar los cambios antes de salir?",
+                            "Advertencia",
+                            JOptionPane.YES_NO_CANCEL_OPTION);
+
+                    if (opcion == JOptionPane.YES_OPTION) {
+                        editorPanel.guardarCambios();
+                        frame.dispose();
+                    } else if (opcion == JOptionPane.NO_OPTION) {
+                        frame.dispose();
+                    }
+                    // Si opcion es CANCEL_OPTION, no se cierra la ventana
+                } else {
+                    frame.dispose();
+                }
+			}
+		});
 
 		MainPanel mainPanel = (MainPanel) frame.getPanelShowing();
 		mainPanel.getBtnAbrir().addActionListener(new ActionListener() {
@@ -90,7 +120,7 @@ public class AppController {
 		});
 
 	}
-
+	
 	private void abrirProyecto() {
 
 		JFileChooser fileChooser = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
@@ -223,11 +253,11 @@ public class AppController {
 		File[] archivos = carpeta.listFiles();
 
 		if (archivos != null) {
-		
-			for (File archivo : archivos) {	
-	
+
+			for (File archivo : archivos) {
+
 				if (archivo.isFile() && archivo.getName().endsWith("Controller.js")) {
-				
+
 					String nombreSinExtension = archivo.getName().replace("Controller.js", "");
 					modules.add(nombreSinExtension);
 				}
@@ -257,6 +287,25 @@ public class AppController {
 
 				crearModulo();
 
+			}
+		});
+		proyectPanel.getTree().addMouseListener(new MouseAdapter() {
+			@Override
+			public void mouseClicked(MouseEvent e) {
+
+				if (e.getClickCount() == 2) {
+
+					editorPanel = new EditorPanel(proyectPanel.getSelectedFile().getAbsolutePath());
+					editorPanel.getBtnGuardar().addActionListener(new ActionListener() {
+						
+						@Override
+						public void actionPerformed(ActionEvent e) {
+							editorPanel.guardarCambios();
+						}
+					});
+
+					proyectPanel.addManagePanel(proyectPanel.getSelectedFile().getName(),editorPanel);
+				}
 			}
 		});
 		frame.changePanel(proyectPanel);
@@ -295,12 +344,12 @@ public class AppController {
 			public void actionPerformed(ActionEvent e) {
 				Module module = createModulePanel.getModule();
 
-				crearArchivo(rutaControllers + "/" + module.getName() + "Controller.js",Controller.getController(module));
+				crearArchivo(rutaControllers + "/" + module.getName() + "Controller.js",
+						Controller.getController(module));
 				crearArchivo(rutaModels + "/" + module.getName() + "Model.js", Model.getModel(module));
-				crearArchivo(rutaRoutes + "/" + module.getName() + "Routes.js", Routes.getRoutes(module));	
-				
-				
-				crearArchivo(rutaRoutes + "/" + "routes.js",RouterMain.getRouter(getModules(rutaControllers)));
+				crearArchivo(rutaRoutes + "/" + module.getName() + "Routes.js", Routes.getRoutes(module));
+
+				crearArchivo(rutaRoutes + "/" + "routes.js", RouterMain.getRouter(getModules(rutaControllers)));
 				crearArchivo(rutaMigrate + "/" + module.getName() + "Migration.js", Migrate.getMigrate(module));
 				proyectPanel.actualizarArchivos();
 				try {
@@ -312,6 +361,7 @@ public class AppController {
 				}
 			}
 		});
-		proyectPanel.addManagePanel(createModulePanel);
+		proyectPanel.addManagePanel("Crear Modulo",createModulePanel);
 	}
+
 }
